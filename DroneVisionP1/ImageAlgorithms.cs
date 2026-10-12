@@ -136,6 +136,7 @@ public static class ImageAlgorithms
 
     public static List<(string Name, byte[,] Data)> Run(Bitmap source, int pipeline, int threshold)
     {
+        if (pipeline == 4) return TeammateAlgorithms.RunHsv(source, 0, 360, 0, 100, 0, 100, false);
         return Run(Grayscale(source), pipeline, threshold);
     }
 
@@ -152,6 +153,7 @@ public static class ImageAlgorithms
             byte[,] edges = Gradient(equalized, true);
             return new() { ("01_equalized", equalized), ("02_sobel", edges), ("03_closing", Closing(Threshold(edges, threshold))) };
         }
+        if (pipeline == 3) return TeammateAlgorithms.RunOtsu(gray);
         throw new ArgumentOutOfRangeException(nameof(pipeline));
     }
 

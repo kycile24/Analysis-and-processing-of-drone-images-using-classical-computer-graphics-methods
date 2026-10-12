@@ -11,6 +11,13 @@ public sealed class MainForm : Form
     private readonly TextBox output = new() { Width = 480, ReadOnly = true };
     private readonly ComboBox pipeline = new() { Width = 230, DropDownStyle = ComboBoxStyle.DropDownList };
     private readonly NumericUpDown threshold = new() { Minimum = 0, Maximum = 255, Value = 80, Width = 75 };
+    private readonly NumericUpDown hMin = new() { Minimum = 0, Maximum = 360, Value = 0, Width = 55 };
+    private readonly NumericUpDown hMax = new() { Minimum = 0, Maximum = 360, Value = 360, Width = 55 };
+    private readonly NumericUpDown sMin = new() { Minimum = 0, Maximum = 100, Value = 0, Width = 55 };
+    private readonly NumericUpDown sMax = new() { Minimum = 0, Maximum = 100, Value = 100, Width = 55 };
+    private readonly NumericUpDown vMin = new() { Minimum = 0, Maximum = 100, Value = 0, Width = 55 };
+    private readonly NumericUpDown vMax = new() { Minimum = 0, Maximum = 100, Value = 100, Width = 55 };
+    private readonly CheckBox invertHsv = new() { Text = "Інвертувати HSV", AutoSize = true };
     private readonly Label status = new() { AutoSize = true, Text = "Оберіть зображення або папку." };
     private readonly PictureBox[] previews = new PictureBox[4];
     private readonly Label[] names = new Label[4];
@@ -24,17 +31,17 @@ public sealed class MainForm : Form
 
     public MainForm()
     {
-        Text = "STEM | Дрони — Учасник №1";
+        Text = "STEM | Дрони — 4 пайплайни";
         Width = 1300; Height = 850; MinimumSize = new Size(900, 650);
         StartPosition = FormStartPosition.CenterScreen;
         Font = new Font("Segoe UI", 10);
 
-        pipeline.Items.AddRange(new object[] { "Обидва пайплайни", "№1 — Прюітт", "№2 — Собель" });
+        pipeline.Items.AddRange(new object[] { "Усі 4 пайплайни", "№1 — Прюітт", "№2 — Собель", "№3 — Оцу + відкриття", "№4 — HSV + ерозія" });
         pipeline.SelectedIndex = 0;
         output.Text = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "DroneResults");
 
         var root = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, Padding = new Padding(12) };
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 126));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 165));
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 64));
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 36));
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, 32));
@@ -51,6 +58,13 @@ public sealed class MainForm : Form
         controls.Controls.Add(pipeline);
         controls.Controls.Add(new Label { Text = "Поріг:", AutoSize = true, Margin = new Padding(8, 9, 2, 0) });
         controls.Controls.Add(threshold);
+        controls.Controls.Add(new Label { Text = "HSV H від/до:", AutoSize = true, Margin = new Padding(8, 9, 2, 0) });
+        controls.Controls.Add(hMin); controls.Controls.Add(hMax);
+        controls.Controls.Add(new Label { Text = "S від/до:", AutoSize = true, Margin = new Padding(8, 9, 2, 0) });
+        controls.Controls.Add(sMin); controls.Controls.Add(sMax);
+        controls.Controls.Add(new Label { Text = "V від/до:", AutoSize = true, Margin = new Padding(8, 9, 2, 0) });
+        controls.Controls.Add(vMin); controls.Controls.Add(vMax);
+        controls.Controls.Add(invertHsv);
         controls.Controls.Add(MakeButton("Запустити обробку", async () => await ProcessAsync()));
 
         var pictures = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 4, RowCount = 1 };
@@ -105,7 +119,11 @@ public sealed class MainForm : Form
         { MessageBox.Show("Оберіть існуючий файл або папку."); return; }
         if (string.IsNullOrWhiteSpace(destination)) { MessageBox.Show("Оберіть папку результатів."); return; }
         int level = (int)threshold.Value;
-        int[] selected = pipeline.SelectedIndex switch { 1 => new[] { 1 }, 2 => new[] { 2 }, _ => new[] { 1, 2 } };
+        int[] selected = pipeline.SelectedIndex switch { 1 => new[] { 1 }, 2 => new[] { 2 }, 3 => new[] { 3 }, 4 => new[] { 4 }, _ => new[] { 1, 2, 3, 4 } };
+        if (sMin.Value > sMax.Value || vMin.Value > vMax.Value)
+        { MessageBox.Show("Перевірте діапазони HSV S та V."); return; }
+        var hsv = new HsvOptions((double)hMin.Value, (double)hMax.Value, (double)sMin.Value, (double)sMax.Value,
+            (double)vMin.Value, (double)vMax.Value, invertHsv.Checked);
         string[] paths = isFolder
             ? Directory.GetFiles(path).Where(p => new[] { ".jpg", ".jpeg", ".png", ".bmp" }.Contains(Path.GetExtension(p).ToLowerInvariant())).OrderBy(p => p).ToArray()
             : new[] { path };
@@ -117,7 +135,7 @@ public sealed class MainForm : Form
         {
             var watch = System.Diagnostics.Stopwatch.StartNew();
             var progress = new Progress<string>(message => status.Text = message);
-            var results = await Task.Run(() => ProcessFiles(paths, destination, selected, level, progress));
+            var results = await Task.Run(() => ProcessFiles(paths, destination, selected, level, hsv, progress));
             watch.Stop();
             foreach (var r in results.Rows)
                 metricsTable.Rows.Add(r.File, r.Pipeline, r.Mse, r.Psnr, r.Ssim);
@@ -135,7 +153,7 @@ public sealed class MainForm : Form
         finally { Enabled = true; }
     }
 
-    private static BatchResult ProcessFiles(string[] paths, string destination, int[] selected, int level, IProgress<string> progress)
+    private static BatchResult ProcessFiles(string[] paths, string destination, int[] selected, int level, HsvOptions hsv, IProgress<string> progress)
     {
         Directory.CreateDirectory(destination);
         var result = new BatchResult();
@@ -152,7 +170,9 @@ public sealed class MainForm : Form
                 foreach (int id in selected)
                 {
                     progress.Report($"Обробка {fileIndex + 1}/{paths.Length}, пайплайн №{id} | Минуло {batchTimer.Elapsed:mm\\:ss}");
-                    var stages = ImageAlgorithms.Run(reference, id, level);
+                    var stages = id == 4
+                        ? TeammateAlgorithms.RunHsv(original, hsv.HMin, hsv.HMax, hsv.SMin, hsv.SMax, hsv.VMin, hsv.VMax, hsv.Invert)
+                        : ImageAlgorithms.Run(reference, id, level);
                     // Додаємо номер файлу, щоб однакові назви не перезаписували результати.
                     string stem = Path.GetFileNameWithoutExtension(path);
                     string folder = Path.Combine(destination, stem, $"pipeline_{id}");
@@ -205,4 +225,7 @@ public sealed class MainForm : Form
         public string[]? PreviewStages { get; set; }
         public string[]? PreviewNames { get; set; }
     }
+
+    private sealed record HsvOptions(double HMin, double HMax, double SMin, double SMax,
+        double VMin, double VMax, bool Invert);
 }
