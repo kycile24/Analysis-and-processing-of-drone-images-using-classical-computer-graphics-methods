@@ -53,6 +53,14 @@ public sealed class MainForm : Form
         controls.Controls.Add(threshold);
         controls.Controls.Add(MakeButton("Запустити обробку", async () => await ProcessAsync()));
 
+        // додав
+        controls.Controls.Add(MakeButton("Пайплайни №3 і №4", () =>
+        {
+            using var participant2Form = new Participant2Form(); // створюємо нашу форму
+
+            participant2Form.ShowDialog(this); // відкриваємо пайплайни №3 та №4
+        }));
+
         var pictures = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 4, RowCount = 1 };
         for (int i = 0; i < 4; i++) pictures.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25));
         root.Controls.Add(pictures, 0, 1);
