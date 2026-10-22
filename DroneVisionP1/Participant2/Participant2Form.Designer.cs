@@ -65,6 +65,13 @@
             label5 = new Label();
             pictureBoxStemHSVEroded = new PictureBox();
             pictureBoxStemHSVMask = new PictureBox();
+            dgvMetrics = new DataGridView();
+            colFile = new DataGridViewTextBoxColumn();
+            colPipeline = new DataGridViewTextBoxColumn();
+            colMSE = new DataGridViewTextBoxColumn();
+            colPSNR = new DataGridViewTextBoxColumn();
+            colSSIM = new DataGridViewTextBoxColumn();
+            btnMetrics = new Button();
             ((System.ComponentModel.ISupportInitialize)pictureBoxStemOriginal).BeginInit();
             ((System.ComponentModel.ISupportInitialize)pictureBoxStemOpening).BeginInit();
             ((System.ComponentModel.ISupportInitialize)pictureBoxStemGray).BeginInit();
@@ -79,6 +86,7 @@
             ((System.ComponentModel.ISupportInitialize)numStemHMin).BeginInit();
             ((System.ComponentModel.ISupportInitialize)pictureBoxStemHSVEroded).BeginInit();
             ((System.ComponentModel.ISupportInitialize)pictureBoxStemHSVMask).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)dgvMetrics).BeginInit();
             SuspendLayout();
             // 
             // pictureBoxStemOriginal
@@ -458,11 +466,67 @@
             pictureBoxStemHSVMask.TabIndex = 0;
             pictureBoxStemHSVMask.TabStop = false;
             // 
-            // Form1
+            // dgvMetrics
+            // 
+            dgvMetrics.AllowUserToAddRows = false;
+            dgvMetrics.AllowUserToDeleteRows = false;
+            dgvMetrics.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+            dgvMetrics.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
+            dgvMetrics.Columns.AddRange(new DataGridViewColumn[] { colFile, colPipeline, colMSE, colPSNR, colSSIM });
+            dgvMetrics.Location = new Point(12, 726);
+            dgvMetrics.Name = "dgvMetrics";
+            dgvMetrics.ReadOnly = true;
+            dgvMetrics.RowHeadersVisible = false;
+            dgvMetrics.Size = new Size(1037, 262);
+            dgvMetrics.TabIndex = 12;
+            // 
+            // colFile
+            // 
+            colFile.HeaderText = "Файл";
+            colFile.Name = "colFile";
+            colFile.ReadOnly = true;
+            // 
+            // colPipeline
+            // 
+            colPipeline.HeaderText = "Пайплайн";
+            colPipeline.Name = "colPipeline";
+            colPipeline.ReadOnly = true;
+            // 
+            // colMSE
+            // 
+            colMSE.HeaderText = "MSE";
+            colMSE.Name = "colMSE";
+            colMSE.ReadOnly = true;
+            // 
+            // colPSNR
+            // 
+            colPSNR.HeaderText = "PSNR, дБ";
+            colPSNR.Name = "colPSNR";
+            colPSNR.ReadOnly = true;
+            // 
+            // colSSIM
+            // 
+            colSSIM.HeaderText = "SSIM (глобальний)";
+            colSSIM.Name = "colSSIM";
+            colSSIM.ReadOnly = true;
+            // 
+            // btnMetrics
+            // 
+            btnMetrics.Location = new Point(473, 694);
+            btnMetrics.Name = "btnMetrics";
+            btnMetrics.Size = new Size(137, 26);
+            btnMetrics.TabIndex = 14;
+            btnMetrics.Text = "Аналіз метриків";
+            btnMetrics.UseVisualStyleBackColor = true;
+            btnMetrics.Click += btnMetrics_Click;
+            // 
+            // Participant2Form
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(1061, 701);
+            ClientSize = new Size(1061, 1000);
+            Controls.Add(btnMetrics);
+            Controls.Add(dgvMetrics);
             Controls.Add(groupBox2);
             Controls.Add(groupBox1);
             Name = "Participant2Form";
@@ -483,6 +547,7 @@
             ((System.ComponentModel.ISupportInitialize)numStemHMin).EndInit();
             ((System.ComponentModel.ISupportInitialize)pictureBoxStemHSVEroded).EndInit();
             ((System.ComponentModel.ISupportInitialize)pictureBoxStemHSVMask).EndInit();
+            ((System.ComponentModel.ISupportInitialize)dgvMetrics).EndInit();
             ResumeLayout(false);
         }
 
@@ -525,5 +590,12 @@
         private Button btnStemSegmentHSV;
         private Button btnStemHSVErosion;
         private Button btnStemSaveAll;
+        private DataGridView dgvMetrics;
+        private DataGridViewTextBoxColumn colFile;
+        private DataGridViewTextBoxColumn colPipeline;
+        private DataGridViewTextBoxColumn colMSE;
+        private DataGridViewTextBoxColumn colPSNR;
+        private DataGridViewTextBoxColumn colSSIM;
+        private Button btnMetrics;
     }
 }

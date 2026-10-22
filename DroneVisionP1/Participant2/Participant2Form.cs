@@ -1,7 +1,8 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
-using System.Drawing.Imaging;    
+using System.Drawing.Imaging;
+using System.Runtime.InteropServices;
 
 namespace DroneVisionP1
 {
@@ -583,14 +584,14 @@ namespace DroneVisionP1
 
             string fileErosion = Path.Combine(folderPath, $"{photoName}_P4_2_Erosion.png");
 
-            string[] outputFiles = 
+            string[] outputFiles =
             {
             fileOriginal,
             fileGray,
             fileOtsu,
             fileOpening,
             fileHSV,
-            fileErosion 
+            fileErosion
             }; // усі шляхи для збереження
 
             foreach (string file in outputFiles) // перевіряємо наявність старих результатів
@@ -627,6 +628,280 @@ namespace DroneVisionP1
             catch (Exception ex) // обробляємо помилки збереження
             {
                 MessageBox.Show("Помилка збереження: " + ex.Message);
+            }
+        }
+
+        // розрахування метриків
+
+        private double CalculateMSE(Bitmap original, Bitmap processed) // обчислення середньоквадратичної похибки між зображеннями
+        {
+            if (original.Width != processed.Width || original.Height != processed.Height) // перевіряємо, чи однакові розміри оригінального та обробленого зображень
+            {
+                throw new ArgumentException("Розміри зображень повинні співпадати.");
+            }
+
+            double sum = 0; // сума квадратів різниць між пікселями
+
+            int pixelCount = original.Width * original.Height; // загальна кількість пікселів
+
+            for (int y = 0; y < original.Height; y++)
+            {
+                for (int x = 0; x < original.Width; x++)
+                {
+                    Color originalPixel = original.GetPixel(x, y); // отримуємо піксель оригінального зображення
+
+                    Color processedPixel = processed.GetPixel(x, y); // отримуємо піксель обробленого зображення
+
+                    double originalGray = 0.299 * originalPixel.R + 0.587 * originalPixel.G + 0.114 * originalPixel.B; // обчислюємо яскравість пікселя оригінального зображення
+
+                    double processedGray = 0.299 * processedPixel.R + 0.587 * processedPixel.G + 0.114 * processedPixel.B; // обчислюємо яскравість пікселя обробленого зображення
+
+                    double difference = originalGray - processedGray; // знаходимо різницю між значеннями яскравості
+
+                    sum += difference * difference; // додаємо квадрат різниці до загальної суми
+                }
+            }
+
+            return sum / pixelCount; // повертаємо середнє значення квадратів різниць
+        }
+
+        private double CalculatePSNR(double mse) // обчислення пікового відношення сигналу до шуму
+        {
+            if (mse == 0) // якщо MSE дорівнює нулю, зображення повністю однакові
+            {
+                return double.PositiveInfinity; // повертаємо нескінченне значення PSNR
+            }
+
+            double maxPixelValue = 255.0; // максимальне значення яскравості одного пікселя
+
+            double psnr = 10.0 * Math.Log10((maxPixelValue * maxPixelValue) / mse); // обчислюємо PSNR за формулою
+
+            return psnr; // повертаємо значення PSNR у децибелах
+        }
+
+        private double CalculateSSIM(Bitmap original, Bitmap processed) // обчислення структурної схожості між зображеннями
+        {
+            if (original.Width != processed.Width || original.Height != processed.Height) // перевіряємо, чи однакові розміри оригінального та обробленого зображень
+            {
+                throw new ArgumentException("Розміри зображень повинні співпадати.");
+            }
+
+            int pixelCount = original.Width * original.Height; // загальна кількість пікселів
+
+            double meanOriginal = 0; // середня яскравість оригінального зображення
+            double meanProcessed = 0; // середня яскравість обробленого зображення
+
+            for (int y = 0; y < original.Height; y++) // обчислюємо середню яскравість обох зображень
+            {
+                for (int x = 0; x < original.Width; x++)
+                {
+                    Color originalPixel = original.GetPixel(x, y); // отримуємо піксель оригінального зображення
+
+                    Color processedPixel = processed.GetPixel(x, y); // отримуємо піксель обробленого зображення
+
+                    double originalGray = 0.299 * originalPixel.R + 0.587 * originalPixel.G + 0.114 * originalPixel.B; // обчислюємо яскравість оригінального пікселя
+
+                    double processedGray = 0.299 * processedPixel.R + 0.587 * processedPixel.G + 0.114 * processedPixel.B; // обчислюємо яскравість обробленого пікселя
+
+                    meanOriginal += originalGray; // додаємо яскравість до загальної суми
+
+                    meanProcessed += processedGray; // додаємо яскравість до загальної суми
+                }
+            }
+
+            meanOriginal /= pixelCount; // знаходимо середню яскравість оригіналу
+
+            meanProcessed /= pixelCount; // знаходимо середню яскравість обробленого зображення
+
+            double varianceOriginal = 0; // дисперсія оригінального зображення
+
+            double varianceProcessed = 0; // дисперсія обробленого зображення
+
+            double covariance = 0; // коваріація між двома зображеннями
+
+            for (int y = 0; y < original.Height; y++) // обчислюємо дисперсію та коваріацію
+            {
+                for (int x = 0; x < original.Width; x++)
+                {
+                    Color originalPixel = original.GetPixel(x, y);
+
+                    Color processedPixel = processed.GetPixel(x, y);
+
+                    double originalGray = 0.299 * originalPixel.R + 0.587 * originalPixel.G + 0.114 * originalPixel.B;
+
+                    double processedGray = 0.299 * processedPixel.R + 0.587 * processedPixel.G + 0.114 * processedPixel.B;
+
+                    double originalDifference = originalGray - meanOriginal; // відхилення від середнього значення
+
+                    double processedDifference = processedGray - meanProcessed; // відхилення від середнього значення
+
+                    varianceOriginal += originalDifference * originalDifference; // накопичуємо дисперсію оригіналу
+
+                    varianceProcessed += processedDifference * processedDifference; // накопичуємо дисперсію результату
+
+                    covariance += originalDifference * processedDifference; // накопичуємо коваріацію
+                }
+            }
+
+            varianceOriginal /= pixelCount; // обчислюємо дисперсію оригіналу
+
+            varianceProcessed /= pixelCount; // обчислюємо дисперсію результату
+
+            covariance /= pixelCount; // обчислюємо коваріацію
+
+            double c1 = Math.Pow(0.01 * 255, 2); // стабілізуюча константа для яскравості
+
+            double c2 = Math.Pow(0.03 * 255, 2); // стабілізуюча константа для контрасту
+
+            double numerator = (2 * meanOriginal * meanProcessed + c1) * (2 * covariance + c2); // обчислюємо чисельник формули SSIM
+
+            double denominator = (meanOriginal * meanOriginal + meanProcessed * meanProcessed + c1) * (varianceOriginal + varianceProcessed + c2); // обчислюємо знаменник формули SSIM
+
+            return numerator / denominator; // повертаємо значення SSIM
+        }
+
+        private Bitmap ProcessOtsuForMetrics(Bitmap original) // виконання пайплайна №3 для автоматичного аналізу метрик
+        {
+            using Bitmap grayImage = ConvertToGrayscale(original); // перетворюємо зображення у відтінки сірого
+
+            int threshold = CalculateOtsuThreshold(grayImage); // автоматично визначаємо поріг методом Оцу
+
+            using Bitmap otsuImage = new Bitmap(grayImage.Width, grayImage.Height); // створюємо бінарне зображення
+
+            for (int y = 0; y < grayImage.Height; y++)
+            {
+                for (int x = 0; x < grayImage.Width; x++)
+                {
+                    Color pixel = grayImage.GetPixel(x, y); // отримуємо піксель сірого зображення
+
+                    int brightness = pixel.R; // отримуємо значення яскравості
+
+                    Color binaryColor;
+
+                    if (brightness <= threshold) // якщо піксель темніший за знайдений поріг
+                    {
+                        binaryColor = Color.White; // позначаємо його білим кольором
+                    }
+                    else
+                    {
+                        binaryColor = Color.Black; // інші пікселі позначаємо чорним кольором
+                    }
+
+                    otsuImage.SetPixel(x, y, binaryColor); // записуємо бінарний піксель
+                }
+            }
+
+            using Bitmap erodedImage = ApplyErosion(otsuImage); // виконуємо ерозію бінарного зображення
+
+            Bitmap openedImage = ApplyDilation(erodedImage); // після ерозії виконуємо дилатацію
+
+            return openedImage; // повертаємо результат морфологічного відкриття
+        }
+
+        private Bitmap ProcessHSVForMetrics(Bitmap original) // виконання пайплайна №4 для автоматичного аналізу метрик
+        {
+            double hMin = (double)numStemHMin.Value; // отримуємо мінімальний колірний тон
+
+            double hMax = (double)numStemHMax.Value; // отримуємо максимальний колірний тон
+
+            double sMin = (double)numStemSMin.Value; // отримуємо мінімальну насиченість
+
+            double sMax = (double)numStemSMax.Value; // отримуємо максимальну насиченість
+
+            double vMin = (double)numStemVMin.Value; // отримуємо мінімальну яскравість
+
+            double vMax = (double)numStemVMax.Value; // отримуємо максимальну яскравість
+
+            using Bitmap hsvMask = new Bitmap(original.Width, original.Height); // створюємо бінарну HSV-маску
+
+            for (int y = 0; y < original.Height; y++)
+            {
+                for (int x = 0; x < original.Width; x++)
+                {
+                    Color pixel = original.GetPixel(x, y); // отримуємо RGB-піксель
+
+                    ConvertRGBtoHSV(pixel, out double h, out double s, out double v); // перетворюємо RGB у HSV
+
+                    bool hueMatches = hMin <= hMax ? h >= hMin && h <= hMax : h >= hMin || h <= hMax; // перевіряємо відповідність колірного тону
+
+                    bool saturationMatches = s >= sMin && s <= sMax; // перевіряємо відповідність насиченості
+
+                    bool valueMatches = v >= vMin && v <= vMax; // перевіряємо відповідність яскравості
+
+                    bool isSelected = hueMatches && saturationMatches && valueMatches; // визначаємо, чи належить піксель вибраному HSV-діапазону
+
+                    if (chkStemHSVInvert.Checked) // перевіряємо необхідність інвертування маски
+                    {
+                        isSelected = !isSelected; // інвертуємо результат
+                    }
+
+                    Color newColor = isSelected ? Color.White : Color.Black; // створюємо білий або чорний піксель маски
+
+                    hsvMask.SetPixel(x, y, newColor); // записуємо піксель у HSV-маску
+                }
+            }
+
+            Bitmap erodedImage = ApplyErosion(hsvMask); // застосовуємо ерозію до HSV-маски
+
+            return erodedImage; // повертаємо результат після ерозії
+        }
+
+        private void btnMetrics_Click(object sender, EventArgs e) // аналіз метрик для всіх завантажених фотографій
+        {
+            if (stemImageFiles.Length == 0) // перевіряємо, чи завантажена папка з фотографіями
+            {
+                MessageBox.Show("Спочатку завантажте папку з фотографіями.");
+                return;
+            }
+
+            if (numStemSMin.Value > numStemSMax.Value || numStemVMin.Value > numStemVMax.Value) // перевіряємо правильність діапазонів S та V
+            {
+                MessageBox.Show("Перевірте діапазони S та V.");
+                return;
+            }
+
+            dgvMetrics.Rows.Clear(); // очищаємо попередні результати з таблиці
+
+            try
+            {
+                foreach (string filePath in stemImageFiles) // послідовно обробляємо всі фотографії із завантаженої папки
+                {
+                    string fileName = Path.GetFileName(filePath); // отримуємо назву поточного файла
+
+                    using Bitmap source = new Bitmap(filePath); // відкриваємо поточну фотографію
+
+                    using Bitmap original = new Bitmap(source); // створюємо копію оригінального зображення
+
+                    // Пайплайн №3
+
+                    using Bitmap otsuResult = ProcessOtsuForMetrics(original); // виконуємо метод Оцу та морфологічне відкриття
+
+                    double mseP3 = CalculateMSE(original, otsuResult); // обчислюємо MSE для пайплайна №3
+
+                    double psnrP3 = CalculatePSNR(mseP3); // обчислюємо PSNR для пайплайна №3
+
+                    double ssimP3 = CalculateSSIM(original, otsuResult); // обчислюємо SSIM для пайплайна №3
+
+                    dgvMetrics.Rows.Add(fileName, "Otsu + Opening", mseP3.ToString("F2"), double.IsPositiveInfinity(psnrP3) ? "∞" : psnrP3.ToString("F2"), ssimP3.ToString("F4")); // додаємо результати пайплайна №3 у таблицю
+
+                    // Пайплайн №4
+
+                    using Bitmap hsvResult = ProcessHSVForMetrics(original); // виконуємо HSV-сегментацію та ерозію
+
+                    double mseP4 = CalculateMSE(original, hsvResult); // обчислюємо MSE для пайплайна №4
+
+                    double psnrP4 = CalculatePSNR(mseP4); // обчислюємо PSNR для пайплайна №4
+
+                    double ssimP4 = CalculateSSIM(original, hsvResult); // обчислюємо SSIM для пайплайна №4
+
+                    dgvMetrics.Rows.Add(fileName, "HSV + Erosion", mseP4.ToString("F2"), double.IsPositiveInfinity(psnrP4) ? "∞" : psnrP4.ToString("F2"), ssimP4.ToString("F4")); // додаємо результати пайплайна №4 у таблицю
+                }
+
+                MessageBox.Show($"Аналіз завершено.\nОброблено фотографій: {stemImageFiles.Length}"); // повідомляємо кількість проаналізованих фотографій
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Помилка під час аналізу метрик: " + ex.Message); // повідомляємо про помилку під час аналізу
             }
         }
     }
